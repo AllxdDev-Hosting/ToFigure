@@ -28,6 +28,39 @@
         input[type="file"] {
             display: none;
         }
+        /* Zoom Modal styles */
+        .zoom-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+        .zoom-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .zoomable-image {
+             cursor: zoom-in;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
@@ -43,7 +76,7 @@
                 <div class="flex flex-col items-center justify-center bg-gray-900 p-6 rounded-lg border-2 border-dashed border-gray-600 h-80">
                     <label for="image-input" id="image-drop-area" class="cursor-pointer flex flex-col items-center justify-center text-center w-full h-full">
                          <div id="image-preview-container" class="hidden w-full h-full">
-                            <img id="image-preview" src="#" alt="Image Preview" class="w-full h-full object-contain rounded-md"/>
+                            <img id="image-preview" src="#" alt="Image Preview" class="w-full h-full object-contain rounded-md zoomable-image"/>
                         </div>
                         <div id="upload-placeholder" class="flex flex-col items-center">
                              <svg class="w-12 h-12 text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -57,7 +90,7 @@
                 <!-- Result Image Section -->
                  <div id="result-container" class="flex flex-col items-center justify-center bg-gray-900 p-6 rounded-lg border-2 border-dashed border-gray-600 h-80">
                      <div id="loader" class="loader hidden"></div>
-                     <img id="result-image" src="#" class="hidden w-full h-full object-contain rounded-md" alt="Generated AI Image">
+                     <img id="result-image" src="#" class="hidden w-full h-full object-contain rounded-md zoomable-image" alt="Generated AI Image">
                      <div id="result-placeholder" class="text-center text-gray-500">
                          <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
                          <p>Hasil gambar akan muncul di sini</p>
@@ -65,13 +98,28 @@
                  </div>
             </div>
             
-            <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-800 transition-all duration-300 ease-in-out disabled:bg-gray-500 disabled:cursor-not-allowed">
-                Generate Figurine Image
-            </button>
+            <div class="flex space-x-4">
+                <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-800 transition-all duration-300 ease-in-out disabled:bg-gray-500 disabled:cursor-not-allowed">
+                    Generate Figurine Image
+                </button>
+                <a id="download-btn" href="#" download="ai_figurine_by_allxddev.png" class="hidden w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-green-800 transition-all duration-300 ease-in-out text-center">
+                    Download Image
+                </a>
+            </div>
         </form>
         
         <div id="status-message" class="mt-4 text-center text-sm text-gray-400 min-h-[20px]"></div>
 
+        <footer class="text-center text-gray-500 text-xs mt-8 border-t border-gray-700 pt-4">
+            <p>Copyright &copy; allxddev</p>
+            <p>WA: 6288297793616 | Telegram: allxddev | Email: allxddev@gmail.com</p>
+        </footer>
+    </div>
+
+    <!-- Zoom Modal -->
+    <div id="zoom-modal" class="zoom-modal hidden">
+        <span id="zoom-modal-close" class="zoom-modal-close">&times;</span>
+        <img class="zoom-modal-content" id="zoomed-image">
     </div>
 
     <script>
@@ -79,6 +127,7 @@
         const imageInput = document.getElementById('image-input');
         const submitBtn = document.getElementById('submit-btn');
         const statusMessage = document.getElementById('status-message');
+        const downloadBtn = document.getElementById('download-btn');
         
         const imagePreview = document.getElementById('image-preview');
         const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -88,9 +137,12 @@
         const loader = document.getElementById('loader');
         const resultPlaceholder = document.getElementById('result-placeholder');
 
+        // Zoom Modal elements
+        const zoomModal = document.getElementById('zoom-modal');
+        const zoomedImage = document.getElementById('zoomed-image');
+        const closeModalBtn = document.getElementById('zoom-modal-close');
+
         const BASE_URL = "https://ai-apps.codergautam.dev";
-        
-        // This is the fixed prompt that will always be used.
         const FIXED_PROMPT = "Using the nano-banana model, a commercial 1/7 scale figurine of the character in the picture was created, depicting a realistic style and a realistic environment. The figurine is placed on a computer desk with a round transparent acrylic base. There is no text on the base. The computer screen shows the Zbrush modeling process of the figurine. Next to the computer screen is a BANDAI-style toy box with the original painting printed on it.";
 
         // Show image preview on file selection
@@ -111,28 +163,27 @@
         imageForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const file = imageInput.files[0];
-
             if (!file) {
                 updateStatus("Harap unggah gambar terlebih dahulu.", true);
                 return;
             }
-
             setLoadingState(true);
-
             try {
-                // Call the img2img function with the uploaded file and the fixed prompt
                 const resultBuffer = await img2img(file, FIXED_PROMPT);
                 const imageUrl = URL.createObjectURL(new Blob([resultBuffer], { type: 'image/jpeg' }));
                 
                 resultImage.src = imageUrl;
                 resultImage.classList.remove('hidden');
                 resultPlaceholder.classList.add('hidden');
-                updateStatus("Gambar berhasil dibuat!", false);
+                
+                downloadBtn.href = imageUrl;
+                downloadBtn.classList.remove('hidden');
 
+                updateStatus("Gambar berhasil dibuat!", false);
             } catch (error) {
                 console.error("Error:", error);
                 updateStatus(`Gagal membuat gambar: ${error.message}`, true);
-                resultPlaceholder.classList.remove('hidden'); // Show placeholder again on error
+                resultPlaceholder.classList.remove('hidden');
             } finally {
                 setLoadingState(false);
             }
@@ -141,12 +192,12 @@
         function setLoadingState(isLoading) {
             submitBtn.disabled = isLoading;
             imageInput.disabled = isLoading;
-
             if (isLoading) {
                 submitBtn.innerText = "Generating...";
                 loader.classList.remove('hidden');
                 resultImage.classList.add('hidden');
                 resultPlaceholder.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
             } else {
                 submitBtn.innerText = "Generate Figurine Image";
                 loader.classList.add('hidden');
@@ -160,8 +211,22 @@
                 : 'mt-4 text-center text-sm text-green-400 min-h-[20px]';
         }
         
-        // --- API Logic translated from Node.js to Browser JS ---
+        // --- Zoom Logic ---
+        function openZoomModal(src) {
+            zoomedImage.src = src;
+            zoomModal.classList.remove('hidden');
+        }
+        
+        imagePreview.addEventListener('click', () => openZoomModal(imagePreview.src));
+        resultImage.addEventListener('click', () => openZoomModal(resultImage.src));
+        closeModalBtn.addEventListener('click', () => zoomModal.classList.add('hidden'));
+        zoomModal.addEventListener('click', (e) => {
+             if (e.target === zoomModal) { // Close if clicking on the background
+                zoomModal.classList.add('hidden');
+            }
+        });
 
+        // --- API Logic ---
         function acakName(len = 10) {
             const chars = "abcdefghijklmnopqrstuvwxyz";
             return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -175,7 +240,6 @@
             const uid = generateUID();
             const email = `gienetic${Date.now()}@nyahoo.com`;
             const payload = { uid, email, displayName: acakName(), photoURL: "https://i.pravatar.cc/150", appId: "photogpt" };
-            
             try {
                 const res = await fetch(`${BASE_URL}/photogpt/create-user`, {
                     method: 'POST',
@@ -193,33 +257,27 @@
         async function img2img(imageFile, prompt) {
             updateStatus("Mendaftarkan sesi...");
             const uid = await autoregist();
-
             const form = new FormData();
             form.append("image", imageFile, imageFile.name);
             form.append("prompt", prompt);
             form.append("userId", uid);
-            
             try {
                 updateStatus("Mengunggah gambar...");
                 const uploadRes = await fetch(`${BASE_URL}/photogpt/generate-image`, {
                     method: 'POST',
                     body: form
                 });
-
                 const uploadData = await uploadRes.json();
                 if (!uploadRes.ok || !uploadData.success) {
                     throw new Error("Gagal memulai proses: " + (uploadData.message || JSON.stringify(uploadData)));
                 }
-
                 const { pollingUrl } = uploadData;
                 let status = "pending";
                 let resultUrl = null;
-
                 for (let i = 0; i < 10; i++) {
                     updateStatus(`Menunggu hasil... (Percobaan ${i + 1}/10)`);
                     const pollRes = await fetch(pollingUrl);
                     const pollData = await pollRes.json();
-                    
                     status = pollData.status;
                     if (status === "Ready") {
                         resultUrl = pollData.result.url;
@@ -229,9 +287,7 @@
                     }
                     await new Promise(r => setTimeout(r, 4000));
                 }
-
                 if (!resultUrl) throw new Error("Gagal mendapatkan hasil gambar (waktu habis).");
-                
                 updateStatus("Mengunduh hasil gambar...");
                 const resultImg = await fetch(resultUrl);
                 if (!resultImg.ok) throw new Error("Gagal mengunduh gambar hasil.");
